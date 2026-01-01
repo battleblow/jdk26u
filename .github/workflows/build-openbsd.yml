@@ -69,7 +69,6 @@ jobs:
 
     env:
       MYTOKEN : ${{ secrets.MYTOKEN }}
-      VM_SCRIPT_DIR : ${{ github.workspace }}/../../_actions/vmactions/openbsd-vm/v1
 
     strategy:
       fail-fast: false

@@ -53,7 +53,7 @@ runs:
     - name: 'Copy back files from VM'
       shell: bash
       run: >
-        bash $VM_SCRIPT_DIR/run.sh rsyncBackFromVM
+        rsync -av --exclude .git -e ssh ${{ inputs.vm-name }}:${{ github.workspace }}/ ${{ github.workspace }}/
 
     - name: 'Check for failure'
       id: check
