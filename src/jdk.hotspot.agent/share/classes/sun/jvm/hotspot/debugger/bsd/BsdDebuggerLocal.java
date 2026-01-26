@@ -80,7 +80,11 @@ public class BsdDebuggerLocal extends DebuggerBase implements BsdDebugger {
     // loadObjectList is filled by attach0 method
     private List<LoadObject> loadObjectList;
 
+    // MacOS code uses this thread list
     private List<JavaThread> javaThreadList;
+
+    // BSD code uses this thread list
+    private List<ThreadProxy> threadList;
 
     // called by native method lookupByAddress0
     private ClosestSymbol createClosestSymbol(String name, long offset) {
@@ -272,6 +276,7 @@ public class BsdDebuggerLocal extends DebuggerBase implements BsdDebugger {
     public synchronized void attach(int processID) throws DebuggerException {
         checkAttached();
         loadObjectList = new ArrayList<>();
+        threadList = new ArrayList<>();
         class AttachTask implements WorkerThreadTask {
            int pid;
            public void doit(BsdDebuggerLocal debugger) {
@@ -291,6 +296,7 @@ public class BsdDebuggerLocal extends DebuggerBase implements BsdDebugger {
     public synchronized void attach(String execName, String coreName) {
         checkAttached();
         loadObjectList = new ArrayList<>();
+        threadList = new ArrayList<>();
         attach0(execName, coreName);
         attached = true;
         isCore = true;
@@ -303,6 +309,7 @@ public class BsdDebuggerLocal extends DebuggerBase implements BsdDebugger {
             return false;
         }
 
+        threadList = null;
         javaThreadList = null;
         loadObjectList = null;
 

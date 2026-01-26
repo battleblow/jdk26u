@@ -35,20 +35,8 @@
 #define amd64 1
 #endif
 
-#if defined(i386) && !defined(i586)
-#define i586 1
-#endif
-
-#ifdef i586
-#include "sun_jvm_hotspot_debugger_x86_X86ThreadContext.h"
-#endif
-
 #ifdef amd64
 #include "sun_jvm_hotspot_debugger_amd64_AMD64ThreadContext.h"
-#endif
-
-#if defined(sparc) || defined(sparcv9)
-#include "sun_jvm_hotspot_debugger_sparc_SPARCThreadContext.h"
 #endif
 
 #if defined(ppc64) || defined(ppc64le)
@@ -115,7 +103,6 @@ struct ps_prochandle* get_proc_handle(JNIEnv* env, jobject this_obj) {
 extern "C"
 JNIEXPORT void JNICALL Java_sun_jvm_hotspot_debugger_bsd_BsdDebuggerLocal_init0
   (JNIEnv *env, jclass cls) {
-  jclass listClass;
 
   if (init_libproc(getenv("LIBSAPROC_DEBUG") != NULL) != true) {
      THROW_NEW_DEBUGGER_EXCEPTION("can't initialize libproc");
@@ -139,8 +126,9 @@ JNIEXPORT void JNICALL Java_sun_jvm_hotspot_debugger_bsd_BsdDebuggerLocal_init0
   getThreadForThreadId_ID = env->GetMethodID(cls, "getThreadForThreadId",
                                                      "(J)Lsun/jvm/hotspot/debugger/ThreadProxy;");
   CHECK_EXCEPTION;
+
   // java.util.List method we call
-  listClass = env->FindClass("java/util/List");
+  jclass listClass = env->FindClass("java/util/List");
   CHECK_EXCEPTION;
   listAdd_ID = env->GetMethodID(listClass, "add", "(Ljava/lang/Object;)Z");
   CHECK_EXCEPTION;
