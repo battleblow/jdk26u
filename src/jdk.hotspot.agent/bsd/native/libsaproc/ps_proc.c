@@ -49,63 +49,41 @@ typedef enum {
   ATTACH_THREAD_DEAD
 } attach_state_t;
 
-static inline uintptr_t align(uintptr_t ptr, size_t size) {
-  return (ptr & ~(size - 1));
-}
-
 // ---------------------------------------------
 // ptrace functions
 // ---------------------------------------------
 
 // read "size" bytes of data from "addr" within the target process.
-// unlike the standard ptrace() function, process_read_data() can handle
-// unaligned address - alignment check, if required, should be done
-// before calling process_read_data.
+//
+// On BSD ptrace(2) does not have any alignment requirements on the remote process' address
 
 static bool process_read_data(struct ps_prochandle* ph, uintptr_t addr, char *buf, size_t size) {
-  int rslt;
-  size_t i, words;
+
   uintptr_t end_addr = addr + size;
-  uintptr_t aligned_addr = align(addr, sizeof(int));
+  size_t words = (end_addr - addr) / sizeof(int);
 
-  if (aligned_addr != addr) {
-    char *ptr = (char *)&rslt;
+  for (size_t i = 0; i < words; i++) {
     errno = 0;
-    rslt = ptrace(PT_READ_D, ph->pid, (caddr_t) aligned_addr, 0);
+    int rslt = ptrace(PT_READ_D, ph->pid, (caddr_t) addr, 0);
     if (errno) {
-      print_error("ptrace(PT_READ_D, ..) failed for %d bytes @ %lx\n", size, addr);
-      return false;
-    }
-    for (; aligned_addr != addr; aligned_addr++, ptr++);
-    for (; ((intptr_t)aligned_addr % sizeof(int)) && aligned_addr < end_addr;
-        aligned_addr++)
-       *(buf++) = *(ptr++);
-  }
-
-  words = (end_addr - aligned_addr) / sizeof(int);
-
-  // assert((intptr_t)aligned_addr % sizeof(int) == 0);
-  for (i = 0; i < words; i++) {
-    errno = 0;
-    rslt = ptrace(PT_READ_D, ph->pid, (caddr_t) aligned_addr, 0);
-    if (errno) {
-      print_error("ptrace(PT_READ_D, ..) failed for %d bytes @ %lx\n", size, addr);
+      print_error("ptrace(PT_READ_D, ..) failed with errno = %d for %d bytes @ %lx\n", errno, size, addr);
       return false;
     }
     *(int *)buf = rslt;
     buf += sizeof(int);
-    aligned_addr += sizeof(int);
+    addr += sizeof(int);
   }
 
-  if (aligned_addr != end_addr) {
+  if (addr < end_addr) {
+    int rslt;
     char *ptr = (char *)&rslt;
     errno = 0;
-    rslt = ptrace(PT_READ_D, ph->pid, (caddr_t) aligned_addr, 0);
+    rslt = ptrace(PT_READ_D, ph->pid, (caddr_t) addr, 0);
     if (errno) {
-      print_error("ptrace(PT_READ_D, ..) failed for %d bytes @ %lx\n", size, addr);
+      print_error("ptrace(PT_READ_D, ..) failed with errno = %d for remaining %d bytes @ %lx\n", errno, end_addr - addr, addr);
       return false;
     }
-    for (; aligned_addr != end_addr; aligned_addr++)
+    for (; addr != end_addr; addr++)
        *(buf++) = *(ptr++);
   }
   return true;
