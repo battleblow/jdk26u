@@ -59,33 +59,28 @@ typedef enum {
 
 static bool process_read_data(struct ps_prochandle* ph, uintptr_t addr, char *buf, size_t size) {
 
-  uintptr_t end_addr = addr + size;
-  size_t words = (end_addr - addr) / sizeof(int);
+  struct ptrace_io_desc piod = {
+    .piod_op = PIOD_READ_D,
+    .piod_offs = (void *) addr,
+    .piod_addr = (void *) buf,
+    .piod_len = size
+  };
 
-  for (size_t i = 0; i < words; i++) {
-    errno = 0;
-    int rslt = ptrace(PT_READ_D, ph->pid, (caddr_t) addr, 0);
-    if (errno) {
-      print_error("ptrace(PT_READ_D, ..) failed with errno = %d for %d bytes @ %lx\n", errno, size, addr);
-      return false;
-    }
-    *(int *)buf = rslt;
-    buf += sizeof(int);
-    addr += sizeof(int);
+  errno = 0;
+  int rc = ptrace(PT_IO, ph->pid, (caddr_t) &piod, 0);
+
+  if (rc < 0 || errno != 0) {
+    print_error("ptrace(PT_IO, ..) failed with errno = %d for %d bytes @ %lx, %d bytes read\n",
+        errno, size, addr, piod.piod_len);
+    return false;
   }
 
-  if (addr < end_addr) {
-    int rslt;
-    char *ptr = (char *)&rslt;
-    errno = 0;
-    rslt = ptrace(PT_READ_D, ph->pid, (caddr_t) addr, 0);
-    if (errno) {
-      print_error("ptrace(PT_READ_D, ..) failed with errno = %d for remaining %d bytes @ %lx\n", errno, end_addr - addr, addr);
-      return false;
-    }
-    for (; addr != end_addr; addr++)
-       *(buf++) = *(ptr++);
+  if (piod.piod_len < size) {
+    print_error("ptrace(PT_IO, ..) failed to read %d bytes @ %lx, %d bytes read\n",
+        size, addr, piod.piod_len);
+    return false;
   }
+
   return true;
 }
 
