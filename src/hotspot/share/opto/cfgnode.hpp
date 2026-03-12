@@ -84,7 +84,7 @@ private:
   bool _is_unreachable_region;
   LoopStatus _loop_status;
 
-  bool is_possible_unsafe_loop(const PhaseGVN* phase) const;
+  bool is_possible_unsafe_loop() const;
   bool is_unreachable_from_root(const PhaseGVN* phase) const;
 public:
   // Node layout (parallels PhiNode):
@@ -182,6 +182,8 @@ class PhiNode : public TypeNode {
 
   bool is_split_through_mergemem_terminating() const;
 
+  bool wait_for_cast_input_igvn(const PhaseIterGVN* igvn) const;
+
 public:
   // Node layout (parallels RegionNode):
   enum { Region,                // Control input is the Phi's region.
@@ -271,6 +273,7 @@ public:
 #endif //ASSERT
 
   const TypeTuple* collect_types(PhaseGVN* phase) const;
+  bool can_be_replaced_by(const PhiNode* other) const;
 };
 
 //------------------------------GotoNode---------------------------------------
