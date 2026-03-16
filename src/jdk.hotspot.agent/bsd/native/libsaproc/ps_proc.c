@@ -49,65 +49,38 @@ typedef enum {
   ATTACH_THREAD_DEAD
 } attach_state_t;
 
-static inline uintptr_t align(uintptr_t ptr, size_t size) {
-  return (ptr & ~(size - 1));
-}
-
 // ---------------------------------------------
 // ptrace functions
 // ---------------------------------------------
 
 // read "size" bytes of data from "addr" within the target process.
-// unlike the standard ptrace() function, process_read_data() can handle
-// unaligned address - alignment check, if required, should be done
-// before calling process_read_data.
+//
+// On BSD ptrace(2) does not have any alignment requirements on the remote process' address
 
 static bool process_read_data(struct ps_prochandle* ph, uintptr_t addr, char *buf, size_t size) {
-  int rslt;
-  size_t i, words;
-  uintptr_t end_addr = addr + size;
-  uintptr_t aligned_addr = align(addr, sizeof(int));
 
-  if (aligned_addr != addr) {
-    char *ptr = (char *)&rslt;
-    errno = 0;
-    rslt = ptrace(PT_READ_D, ph->pid, (caddr_t) aligned_addr, 0);
-    if (errno) {
-      print_error("ptrace(PT_READ_D, ..) failed for %d bytes @ %lx\n", size, addr);
-      return false;
-    }
-    for (; aligned_addr != addr; aligned_addr++, ptr++);
-    for (; ((intptr_t)aligned_addr % sizeof(int)) && aligned_addr < end_addr;
-        aligned_addr++)
-       *(buf++) = *(ptr++);
+  struct ptrace_io_desc piod = {
+    .piod_op = PIOD_READ_D,
+    .piod_offs = (void *) addr,
+    .piod_addr = (void *) buf,
+    .piod_len = size
+  };
+
+  errno = 0;
+  int rc = ptrace(PT_IO, ph->pid, (caddr_t) &piod, 0);
+
+  if (rc < 0 || errno != 0) {
+    print_error("ptrace(PT_IO, ..) failed with errno = %d for %d bytes @ %lx, %d bytes read\n",
+        errno, size, addr, piod.piod_len);
+    return false;
   }
 
-  words = (end_addr - aligned_addr) / sizeof(int);
-
-  // assert((intptr_t)aligned_addr % sizeof(int) == 0);
-  for (i = 0; i < words; i++) {
-    errno = 0;
-    rslt = ptrace(PT_READ_D, ph->pid, (caddr_t) aligned_addr, 0);
-    if (errno) {
-      print_error("ptrace(PT_READ_D, ..) failed for %d bytes @ %lx\n", size, addr);
-      return false;
-    }
-    *(int *)buf = rslt;
-    buf += sizeof(int);
-    aligned_addr += sizeof(int);
+  if (piod.piod_len < size) {
+    print_error("ptrace(PT_IO, ..) failed to read %d bytes @ %lx, %d bytes read\n",
+        size, addr, piod.piod_len);
+    return false;
   }
 
-  if (aligned_addr != end_addr) {
-    char *ptr = (char *)&rslt;
-    errno = 0;
-    rslt = ptrace(PT_READ_D, ph->pid, (caddr_t) aligned_addr, 0);
-    if (errno) {
-      print_error("ptrace(PT_READ_D, ..) failed for %d bytes @ %lx\n", size, addr);
-      return false;
-    }
-    for (; aligned_addr != end_addr; aligned_addr++)
-       *(buf++) = *(ptr++);
-  }
   return true;
 }
 
@@ -121,7 +94,7 @@ static bool process_write_data(struct ps_prochandle* ph,
 static bool process_get_lwp_regs(struct ps_prochandle* ph, lwpid_t lwpid, struct reg *user) {
   // we have already attached to all thread 'pid's, just use ptrace call
   // to get regset now. Note that we don't cache regset upfront for processes.
- if (ptrace(PT_GETREGS, ph->pid, (caddr_t) user, 0) < 0) {
+ if (ptrace(PT_GETREGS, lwpid, (caddr_t) user, 0) < 0) {
    print_error("ptrace(PTRACE_GETREGS, ...) failed for lwp %d (%d)\n", lwpid, ph->pid);
    return false;
  }
