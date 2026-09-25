@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, 2025, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2020, 2026, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -1028,8 +1028,8 @@ void C2_MacroAssembler::evminmax_fp(int opcode, BasicType elem_bt,
   }
 }
 
-void C2_MacroAssembler::vminmax_fp(int opc, BasicType elem_bt, XMMRegister dst, KRegister mask,
-                                   XMMRegister src1, XMMRegister src2, int vlen_enc) {
+void C2_MacroAssembler::vminmax_fp_avx10_2(int opc, BasicType elem_bt, XMMRegister dst, KRegister mask,
+                                           XMMRegister src1, XMMRegister src2, int vlen_enc) {
   assert(opc == Op_MinV || opc == Op_MinReductionV ||
          opc == Op_MaxV || opc == Op_MaxReductionV, "sanity");
 
@@ -1043,23 +1043,49 @@ void C2_MacroAssembler::vminmax_fp(int opc, BasicType elem_bt, XMMRegister dst, 
   }
 }
 
+void C2_MacroAssembler::sminmax_fp_avx10_2(int opc, BasicType elem_bt, XMMRegister dst, KRegister mask,
+                                           XMMRegister src1, XMMRegister src2) {
+  assert(opc == Op_MinF || opc == Op_MaxF ||
+         opc == Op_MinD || opc == Op_MaxD, "sanity");
+
+  int imm8 = (opc == Op_MinF || opc == Op_MinD) ? AVX10_2_MINMAX_MIN_COMPARE_SIGN
+                                                : AVX10_2_MINMAX_MAX_COMPARE_SIGN;
+  if (elem_bt == T_FLOAT) {
+    evminmaxss(dst, mask, src1, src2, true, imm8);
+  } else {
+    assert(elem_bt == T_DOUBLE, "");
+    evminmaxsd(dst, mask, src1, src2, true, imm8);
+  }
+}
+
 // Float/Double signum
 void C2_MacroAssembler::signum_fp(int opcode, XMMRegister dst, XMMRegister zero, XMMRegister one) {
   assert(opcode == Op_SignumF || opcode == Op_SignumD, "sanity");
 
   Label DONE_LABEL;
 
+  // Handle special cases +0.0/-0.0 and NaN, if argument is +0.0/-0.0 or NaN, return argument
+  // If AVX10.2 (or newer) floating point comparison instructions used, SF=1 for equal and unordered cases
+  // If other floating point comparison instructions used, ZF=1 for equal and unordered cases
   if (opcode == Op_SignumF) {
-    ucomiss(dst, zero);
-    jcc(Assembler::equal, DONE_LABEL);    // handle special case +0.0/-0.0, if argument is +0.0/-0.0, return argument
-    jcc(Assembler::parity, DONE_LABEL);   // handle special case NaN, if argument NaN, return NaN
+    if (VM_Version::supports_avx10_2()) {
+      evucomxss(dst, zero);
+      jcc(Assembler::negative, DONE_LABEL);
+    } else {
+      ucomiss(dst, zero);
+      jcc(Assembler::equal, DONE_LABEL);
+    }
     movflt(dst, one);
     jcc(Assembler::above, DONE_LABEL);
     xorps(dst, ExternalAddress(StubRoutines::x86::vector_float_sign_flip()), noreg);
   } else if (opcode == Op_SignumD) {
-    ucomisd(dst, zero);
-    jcc(Assembler::equal, DONE_LABEL);    // handle special case +0.0/-0.0, if argument is +0.0/-0.0, return argument
-    jcc(Assembler::parity, DONE_LABEL);   // handle special case NaN, if argument NaN, return NaN
+    if (VM_Version::supports_avx10_2()) {
+      evucomxsd(dst, zero);
+      jcc(Assembler::negative, DONE_LABEL);
+    } else {
+      ucomisd(dst, zero);
+      jcc(Assembler::equal, DONE_LABEL);
+    }
     movdbl(dst, one);
     jcc(Assembler::above, DONE_LABEL);
     xorpd(dst, ExternalAddress(StubRoutines::x86::vector_double_sign_flip()), noreg);
@@ -2336,7 +2362,7 @@ void C2_MacroAssembler::reduceFloatMinMax(int opcode, int vlen, bool is_dst_vali
     }
 
     if (VM_Version::supports_avx10_2()) {
-      vminmax_fp(opcode, T_FLOAT, wdst, k0, wtmp, wsrc, vlen_enc);
+      vminmax_fp_avx10_2(opcode, T_FLOAT, wdst, k0, wtmp, wsrc, vlen_enc);
     } else {
       vminmax_fp(opcode, T_FLOAT, wdst, wtmp, wsrc, tmp, atmp, btmp, vlen_enc);
     }
@@ -2345,7 +2371,7 @@ void C2_MacroAssembler::reduceFloatMinMax(int opcode, int vlen, bool is_dst_vali
   }
   if (is_dst_valid) {
     if (VM_Version::supports_avx10_2()) {
-      vminmax_fp(opcode, T_FLOAT, dst, k0, wdst, dst, Assembler::AVX_128bit);
+      vminmax_fp_avx10_2(opcode, T_FLOAT, dst, k0, wdst, dst, Assembler::AVX_128bit);
     } else {
       vminmax_fp(opcode, T_FLOAT, dst, wdst, dst, tmp, atmp, btmp, Assembler::AVX_128bit);
     }
@@ -2376,7 +2402,7 @@ void C2_MacroAssembler::reduceDoubleMinMax(int opcode, int vlen, bool is_dst_val
     }
 
     if (VM_Version::supports_avx10_2()) {
-      vminmax_fp(opcode, T_DOUBLE, wdst, k0, wtmp, wsrc, vlen_enc);
+      vminmax_fp_avx10_2(opcode, T_DOUBLE, wdst, k0, wtmp, wsrc, vlen_enc);
     } else {
       vminmax_fp(opcode, T_DOUBLE, wdst, wtmp, wsrc, tmp, atmp, btmp, vlen_enc);
     }
@@ -2387,7 +2413,7 @@ void C2_MacroAssembler::reduceDoubleMinMax(int opcode, int vlen, bool is_dst_val
 
   if (is_dst_valid) {
     if (VM_Version::supports_avx10_2()) {
-      vminmax_fp(opcode, T_DOUBLE, dst, k0, wdst, dst, Assembler::AVX_128bit);
+      vminmax_fp_avx10_2(opcode, T_DOUBLE, dst, k0, wdst, dst, Assembler::AVX_128bit);
     } else {
       vminmax_fp(opcode, T_DOUBLE, dst, wdst, dst, tmp, atmp, btmp, Assembler::AVX_128bit);
     }
@@ -6997,13 +7023,25 @@ void C2_MacroAssembler::evfp16ph(int opcode, XMMRegister dst, XMMRegister src1, 
   }
 }
 
-void C2_MacroAssembler::scalar_max_min_fp16(int opcode, XMMRegister dst, XMMRegister src1, XMMRegister src2,
-                                            KRegister ktmp, XMMRegister xtmp1, XMMRegister xtmp2) {
-  vector_max_min_fp16(opcode, dst, src1, src2, ktmp, xtmp1, xtmp2, Assembler::AVX_128bit);
+void C2_MacroAssembler::sminmax_fp16(int opcode, XMMRegister dst, XMMRegister src1, XMMRegister src2,
+                                     KRegister ktmp, XMMRegister xtmp1, XMMRegister xtmp2) {
+  vminmax_fp16(opcode, dst, src1, src2, ktmp, xtmp1, xtmp2, Assembler::AVX_128bit);
 }
 
-void C2_MacroAssembler::vector_max_min_fp16(int opcode, XMMRegister dst, XMMRegister src1, XMMRegister src2,
-                                            KRegister ktmp, XMMRegister xtmp1, XMMRegister xtmp2, int vlen_enc) {
+void C2_MacroAssembler::sminmax_fp16_avx10_2(int opcode, XMMRegister dst, XMMRegister src1, XMMRegister src2,
+                                             KRegister ktmp) {
+  if (opcode == Op_MaxHF) {
+    // dst = max(src1, src2)
+    evminmaxsh(dst, ktmp, src1, src2, true, AVX10_2_MINMAX_MAX_COMPARE_SIGN);
+  } else {
+    assert(opcode == Op_MinHF, "");
+    // dst = min(src1, src2)
+    evminmaxsh(dst, ktmp, src1, src2, true, AVX10_2_MINMAX_MIN_COMPARE_SIGN);
+  }
+}
+
+void C2_MacroAssembler::vminmax_fp16(int opcode, XMMRegister dst, XMMRegister src1, XMMRegister src2,
+                                     KRegister ktmp, XMMRegister xtmp1, XMMRegister xtmp2, int vlen_enc) {
   if (opcode == Op_MaxVHF || opcode == Op_MaxHF) {
     // Move sign bits of src2 to mask register.
     evpmovw2m(ktmp, src2, vlen_enc);
@@ -7044,5 +7082,29 @@ void C2_MacroAssembler::vector_max_min_fp16(int opcode, XMMRegister dst, XMMRegi
     // in case second operand holds a NaN value then as per above semantics
     // result is same as second operand.
     Assembler::evmovdquw(dst, ktmp, xtmp1, true, vlen_enc);
+  }
+}
+
+void C2_MacroAssembler::vminmax_fp16_avx10_2(int opcode, XMMRegister dst, XMMRegister src1, XMMRegister src2,
+                                             KRegister ktmp, int vlen_enc) {
+  if (opcode == Op_MaxVHF) {
+    // dst = max(src1, src2)
+    evminmaxph(dst, ktmp, src1, src2, true, AVX10_2_MINMAX_MAX_COMPARE_SIGN, vlen_enc);
+  } else {
+    assert(opcode == Op_MinVHF, "");
+    // dst = min(src1, src2)
+    evminmaxph(dst, ktmp, src1, src2, true, AVX10_2_MINMAX_MIN_COMPARE_SIGN, vlen_enc);
+  }
+}
+
+void C2_MacroAssembler::vminmax_fp16_avx10_2(int opcode, XMMRegister dst, XMMRegister src1, Address src2,
+                                             KRegister ktmp, int vlen_enc) {
+  if (opcode == Op_MaxVHF) {
+    // dst = max(src1, src2)
+    evminmaxph(dst, ktmp, src1, src2, true, AVX10_2_MINMAX_MAX_COMPARE_SIGN, vlen_enc);
+  } else {
+    assert(opcode == Op_MinVHF, "");
+    // dst = min(src1, src2)
+    evminmaxph(dst, ktmp, src1, src2, true, AVX10_2_MINMAX_MIN_COMPARE_SIGN, vlen_enc);
   }
 }

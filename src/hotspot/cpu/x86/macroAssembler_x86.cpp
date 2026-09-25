@@ -1962,6 +1962,16 @@ void MacroAssembler::movflt(XMMRegister dst, AddressLiteral src, Register rscrat
   }
 }
 
+void MacroAssembler::movhlf(XMMRegister dst, XMMRegister src, Register rscratch) {
+  if (VM_Version::supports_avx10_2()) {
+    evmovw(dst, src);
+  } else {
+    assert(rscratch != noreg, "missing");
+    evmovw(rscratch, src);
+    evmovw(dst, rscratch);
+  }
+}
+
 void MacroAssembler::movptr(Register dst, Register src) {
   movq(dst, src);
 }
@@ -2668,6 +2678,17 @@ void MacroAssembler::ucomisd(XMMRegister dst, AddressLiteral src, Register rscra
   }
 }
 
+void MacroAssembler::evucomxsd(XMMRegister dst, AddressLiteral src, Register rscratch) {
+  assert(rscratch != noreg || always_reachable(src), "missing");
+
+  if (reachable(src)) {
+    Assembler::evucomxsd(dst, as_Address(src));
+  } else {
+    lea(rscratch, src);
+    Assembler::evucomxsd(dst, Address(rscratch, 0));
+  }
+}
+
 void MacroAssembler::ucomiss(XMMRegister dst, AddressLiteral src, Register rscratch) {
   assert(rscratch != noreg || always_reachable(src), "missing");
 
@@ -2676,6 +2697,39 @@ void MacroAssembler::ucomiss(XMMRegister dst, AddressLiteral src, Register rscra
   } else {
     lea(rscratch, src);
     Assembler::ucomiss(dst, Address(rscratch, 0));
+  }
+}
+
+void MacroAssembler::evucomxss(XMMRegister dst, AddressLiteral src, Register rscratch) {
+  assert(rscratch != noreg || always_reachable(src), "missing");
+
+  if (reachable(src)) {
+    Assembler::evucomxss(dst, as_Address(src));
+  } else {
+    lea(rscratch, src);
+    Assembler::evucomxss(dst, Address(rscratch, 0));
+  }
+}
+
+void MacroAssembler::evucomish(XMMRegister dst, AddressLiteral src, Register rscratch) {
+  assert(rscratch != noreg || always_reachable(src), "missing");
+
+  if (reachable(src)) {
+    Assembler::evucomish(dst, as_Address(src));
+  } else {
+    lea(rscratch, src);
+    Assembler::evucomish(dst, Address(rscratch, 0));
+  }
+}
+
+void MacroAssembler::evucomxsh(XMMRegister dst, AddressLiteral src, Register rscratch) {
+  assert(rscratch != noreg || always_reachable(src), "missing");
+
+  if (reachable(src)) {
+    Assembler::evucomxsh(dst, as_Address(src));
+  } else {
+    lea(rscratch, src);
+    Assembler::evucomxsh(dst, Address(rscratch, 0));
   }
 }
 
@@ -8956,7 +9010,7 @@ void MacroAssembler::evpmaxs(BasicType type, XMMRegister dst, KRegister mask, XM
     case T_FLOAT:
       evminmaxps(dst, mask, nds, src, merge, AVX10_2_MINMAX_MAX_COMPARE_SIGN, vector_len); break;
     case T_DOUBLE:
-      evminmaxps(dst, mask, nds, src, merge, AVX10_2_MINMAX_MAX_COMPARE_SIGN, vector_len); break;
+      evminmaxpd(dst, mask, nds, src, merge, AVX10_2_MINMAX_MAX_COMPARE_SIGN, vector_len); break;
     default:
       fatal("Unexpected type argument %s", type2name(type)); break;
   }

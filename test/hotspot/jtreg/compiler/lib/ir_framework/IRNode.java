@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, 2025, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2021, 2026, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -1167,29 +1167,9 @@ public class IRNode {
         beforeMatchingNameRegex(MAX_D, "MaxD");
     }
 
-    public static final String MAX_D_REDUCTION_REG = PREFIX + "MAX_D_REDUCTION_REG" + POSTFIX;
-    static {
-        machOnlyNameRegex(MAX_D_REDUCTION_REG, "maxD_reduction_reg");
-    }
-
-    public static final String MAX_D_REG = PREFIX + "MAX_D_REG" + POSTFIX;
-    static {
-        machOnlyNameRegex(MAX_D_REG, "maxD_reg");
-    }
-
     public static final String MAX_F = PREFIX + "MAX_F" + POSTFIX;
     static {
         beforeMatchingNameRegex(MAX_F, "MaxF");
-    }
-
-    public static final String MAX_F_REDUCTION_REG = PREFIX + "MAX_F_REDUCTION_REG" + POSTFIX;
-    static {
-        machOnlyNameRegex(MAX_F_REDUCTION_REG, "maxF_reduction_reg");
-    }
-
-    public static final String MAX_F_REG = PREFIX + "MAX_F_REG" + POSTFIX;
-    static {
-        machOnlyNameRegex(MAX_F_REG, "maxF_reg");
     }
 
     public static final String MAX_I = PREFIX + "MAX_I" + POSTFIX;
@@ -1273,14 +1253,14 @@ public class IRNode {
         beforeMatchingNameRegex(MIN_D, "MinD");
     }
 
-    public static final String MIN_D_REDUCTION_REG = PREFIX + "MIN_D_REDUCTION_REG" + POSTFIX;
+    public static final String MINMAX_D_REDUCTION_REG = PREFIX + "MINMAX_D_REDUCTION_REG" + POSTFIX;
     static {
-        machOnlyNameRegex(MIN_D_REDUCTION_REG, "minD_reduction_reg");
+        machOnlyNameRegex(MINMAX_D_REDUCTION_REG, "minmaxD_reduction_reg");
     }
 
-    public static final String MIN_D_REG = PREFIX + "MIN_D_REG" + POSTFIX;
+    public static final String MINMAX_D_REG = PREFIX + "MINMAX_D_REG" + POSTFIX;
     static {
-        machOnlyNameRegex(MIN_D_REG, "minD_reg");
+        machOnlyNameRegex(MINMAX_D_REG, "minmaxD_reg");
     }
 
     public static final String MIN_F = PREFIX + "MIN_F" + POSTFIX;
@@ -1288,14 +1268,14 @@ public class IRNode {
         beforeMatchingNameRegex(MIN_F, "MinF");
     }
 
-    public static final String MIN_F_REDUCTION_REG = PREFIX + "MIN_F_REDUCTION_REG" + POSTFIX;
+    public static final String MINMAX_F_REDUCTION_REG = PREFIX + "MINMAX_F_REDUCTION_REG" + POSTFIX;
     static {
-        machOnlyNameRegex(MIN_F_REDUCTION_REG, "minF_reduction_reg");
+        machOnlyNameRegex(MINMAX_F_REDUCTION_REG, "minmaxF_reduction_reg");
     }
 
-    public static final String MIN_F_REG = PREFIX + "MIN_F_REG" + POSTFIX;
+    public static final String MINMAX_F_REG = PREFIX + "MINMAX_F_REG" + POSTFIX;
     static {
-        machOnlyNameRegex(MIN_F_REG, "minF_reg");
+        machOnlyNameRegex(MINMAX_F_REG, "minmaxF_reg");
     }
 
     public static final String MIN_I = PREFIX + "MIN_I" + POSTFIX;
@@ -3043,6 +3023,11 @@ public class IRNode {
     public static final String X86_CMOVEL_IMM01UCF = PREFIX + "X86_CMOVEL_IMM01UCF" + POSTFIX;
     static {
         machOnlyNameRegex(X86_CMOVEL_IMM01UCF, "cmovL_imm_01UCF");
+    }
+
+    public static final String X86_CMOVEL_IMM01UCFE = PREFIX + "X86_CMOVEL_IMM01UCFE" + POSTFIX;
+    static {
+        machOnlyNameRegex(X86_CMOVEL_IMM01UCFE, "cmovL_imm_01UCFE");
     }
 
     public static final String MOD_F = PREFIX + "MOD_F" + POSTFIX;
